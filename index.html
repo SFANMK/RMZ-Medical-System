@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام RMZ الطبي الديناميكي</title>
+
+    <!-- Bootstrap 5 RTL -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" integrity="sha384-nU14brUcp6StFntEOOEBvcJm4huWjB0OcIeQ3fltAfSmuZFrkAif0T+UtNGlKKQv" crossorigin="anonymous">
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    
+    <!-- SweetAlert2 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+
+    <!-- Custom Styles -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
+        
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: #f0f2f5;
+        }
+
+        .navbar {
+            box-shadow: 0 2px 4px rgba(0,0,0,.1);
+        }
+
+        .view {
+            display: none;
+            animation: fadeIn 0.5s;
+        }
+
+        .view.active {
+            display: block;
+        }
+
+        .card {
+            border: 0;
+            box-shadow: 0 0 1rem rgba(0,0,0,.1);
+            border-radius: .75rem;
+        }
+
+        .form-builder-field {
+            border: 1px solid #dee2e6;
+            padding: 1rem;
+            border-radius: .5rem;
+            background-color: #f8f9fa;
+        }
+
+        .btn-primary {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+        }
+
+        .login-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #loading-spinner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar navbar-expand-lg navbar-light bg-white sticky-top" id="main-nav" style="display: none;">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="#"><i class="fas fa-heart-pulse me-2"></i> نظام RMZ</a>
+            <div class="d-flex align-items-center">
+                <span id="welcome-message" class="navbar-text me-3"></span>
+                <button id="logout-btn" class="btn btn-outline-danger btn-sm">
+                    <i class="fas fa-sign-out-alt me-1"></i> تسجيل الخروج
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main id="app-container" class="container py-4">
+        <!-- Views will be rendered here -->
+    </main>
+    
+    <div id="loading-spinner" style="display: none;">
+        <div class="spinner-border text-light" role="status">
+            <span class="visually-hidden">جاري التحميل...</span>
+        </div>
+    </div>
+
+    <!-- View Templates -->
+    <template id="login-view-template">
+        <div class="login-container">
+            <div class="col-12 col-md-8 col-lg-5">
+                <div class="card p-4">
+                    <div class="card-body">
+                        <h2 class="text-center mb-4"><i class="fas fa-heart-pulse me-2"></i> تسجيل الدخول</h2>
+                        <ul class="nav nav-pills nav-fill mb-3" id="pills-tab" role="tablist">
+                          <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="pills-user-tab" data-bs-toggle="pill" data-bs-target="#pills-user" type="button" role="tab" aria-controls="pills-user" aria-selected="true">مستخدم</button>
+                          </li>
+                          <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="pills-admin-tab" data-bs-toggle="pill" data-bs-target="#pills-admin" type="button" role="tab" aria-controls="pills-admin" aria-selected="false">مدير</button>
+                          </li>
+                        </ul>
+                        <div class="tab-content" id="pills-tabContent">
+                          <div class="tab-pane fade show active" id="pills-user" role="tabpanel" aria-labelledby="pills-user-tab">
+                              <form id="user-login-form">
+                                <p class="text-muted text-center small">للتجربة، أدخل أي بريد إلكتروني وكلمة مرور.</p>
+                                <div class="mb-3">
+                                  <label for="user-email" class="form-label">البريد الإلكتروني</label>
+                                  <input type="email" class="form-control" id="user-email" required>
+                                </div>
+                                <div class="mb-3">
+                                  <label for="user-password" class="form-label">كلمة المرور</label>
+                                  <input type="password" class="form-control" id="user-password" required>
+                                </div>
+                                <div class="mb-3">
+                                  <label for="user-role" class="form-label">نوع الحساب</label>
+                                  <select class="form-select" id="user-role">
+                                      <option value="Beneficiary">مستفيد</option>
+                                      <option value="Facility">منشأة</option>
+                                  </select>
+                                </div>
+                                <div class="d-grid">
+                                  <button type="submit" class="btn btn-primary">دخول / تسجيل</button>
+                                </div>
+                              </form>
+                          </div>
+                          <div class="tab-pane fade" id="pills-admin" role="tabpanel" aria-labelledby="pills-admin-tab">
+                              <form id="admin-login-form">
+                                <div class="mb-3">
+                                  <label for="admin-username" class="form-label">اسم المستخدم</label>
+                                  <input type="text" class="form-control" id="admin-username" value="admin" required>
+                                </div>
+                                <div class="mb-3">
+                                  <label for="admin-password" class="form-label">كلمة المرور</label>
+                                  <input type="password" class="form-control" id="admin-password" value="admin123" required>
+                                </div>
+                                <div class="d-grid">
+                                  <button type="submit" class="btn btn-primary">دخول المدير</button>
+                                </div>
+                              </form>
+                          </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template id="admin-dashboard-template">
+        <div class="view" id="admin-dashboard">
+            <ul class="nav nav-tabs mb-3" id="adminTab" role="tablist">
+              <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="submissions-tab" data-bs-toggle="tab" data-bs-target="#submissions" type="button" role="tab" aria-controls="submissions" aria-selected="true"><i class="fas fa-list-check me-2"></i> مراقبة الطلبات</button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="form-builder-tab" data-bs-toggle="tab" data-bs-target="#form-builder" type="button" role="tab" aria-controls="form-builder" aria-selected="false"><i class="fas fa-edit me-2"></i> إنشاء خدمة جديدة</button>
+              </li>
+            </ul>
+            <div class="tab-content" id="adminTabContent">
+              <div class="tab-pane fade show active" id="submissions" role="tabpanel" aria-labelledby="submissions-tab">
+                  <div class="card">
+                      <div class="card-header">
+                          <h5 class="mb-0">جميع الطلبات المقدمة</h5>
+                      </div>
+                      <div class="card-body">
+                          <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>الخدمة</th>
+                                        <th>المقدم</th>
+                                        <th>تاريخ التقديم</th>
+                                        <th>الحالة</th>
+                                        <th>الإجراءات</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="submissions-table-body">
+                                    <!-- Submissions will be rendered here -->
+                                </tbody>
+                            </table>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+              <div class="tab-pane fade" id="form-builder" role="tabpanel" aria-labelledby="form-builder-tab">
+                 <div class="card">
+                     <div class="card-header">
+                         <h5 class="mb-0">إعدادات الخدمة الجديدة</h5>
+                     </div>
+                     <div class="card-body">
+                        <form id="service-definition-form">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="service-name" class="form-label">اسم الخدمة/القسم</label>
+                                    <input type="text" class="form-control" id="service-name" required>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="accessible-to" class="form-label">متاحة لـ</label>
+                                    <select class="form-select" id="accessible-to" required>
+                                        <option value="Beneficiary">مستفيد</option>
+                                        <option value="Facility">منشأة</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <hr>
+                            <h6><i class="fas fa-cubes me-2"></i> حقول النموذج</h6>
+                            <div id="fields-container" class="mb-3">
+                                <!-- Dynamic fields will be added here -->
+                            </div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="add-field-btn"><i class="fas fa-plus me-2"></i> إضافة حقل جديد</button>
+                            <hr>
+                            <div class="d-flex justify-content-end">
+                                <button type="submit" class="btn btn-primary"><i class="fas fa-save me-2"></i> حفظ تعريف الخدمة</button>
+                            </div>
+                        </form>
+                     </div>
+                 </div>
+              </div>
+            </div>
+        </div>
+    </template>
+    
+    <template id="user-dashboard-template">
+        <div class="view" id="user-dashboard">
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-cogs me-2"></i> الخدمات المتاحة</h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="available-services" class="row g-3">
+                                <!-- Available services will be rendered here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-history me-2"></i> طلباتي السابقة</h5>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-group list-group-flush" id="my-submissions">
+                                <!-- User's submissions will be rendered here -->
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+    
+    <template id="form-view-template">
+        <div class="view" id="form-view">
+             <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 id="form-title" class="mb-0"></h5>
+                    <button id="back-to-dashboard-btn" class="btn btn-sm btn-outline-secondary"><i class="fas fa-arrow-right me-2"></i> العودة</button>
+                </div>
+                <div class="card-body">
+                    <form id="dynamic-form" class="row g-3">
+                        <!-- Dynamic form fields will be injected here -->
+                        <div class="col-12 d-flex justify-content-end">
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane me-2"></i> إرسال الطلب</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Modal for viewing submission details -->
+    <div class="modal fade" id="submissionDetailsModal" tabindex="-1" aria-labelledby="submissionDetailsModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="submissionDetailsModalLabel">تفاصيل الطلب</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body" id="submissionDetailsBody">
+            <!-- Details will be loaded here -->
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+
+    <script type="module">
+        // --- FIREBASE CONFIGURATION ---
+        const firebaseConfig = {
+            // PASTE_YOUR_FIREBASE_CONFIG_HERE_PLEASE //
+        };
+
+        // --- INITIALIZE APP ---
+        const app = firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const storage = firebase.storage();
+        
+        // --- GLOBAL STATE ---
+        let currentUser = null;
+        let unsubscribeListeners = [];
+
+        // --- DOM ELEMENTS ---
+        const appContainer = document.getElementById('app-container');
+        const mainNav = document.getElementById('main-nav');
+        const welcomeMessage = document.getElementById('welcome-message');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        let submissionModal;
+
+
+        // --- UTILITY & HELPER FUNCTIONS ---
+        
+        const showLoading = (show) => {
+            loadingSpinner.style.display = show ? 'flex' : 'none';
+        };
+
+        const showAlert = (title, text, icon = 'success') => {
+            Swal.fire({ title, text, icon, confirmButtonText: 'حسنًا' });
+        };
+        
+        const showView = (viewId, params = {}) => {
+            // Clean up old listeners
+            unsubscribeListeners.forEach(unsub => unsub());
+            unsubscribeListeners = [];
+
+            appContainer.innerHTML = ''; // Clear previous view
+            const template = document.getElementById(`${viewId}-template`);
+            if (template) {
+                const viewClone = template.content.cloneNode(true);
+                appContainer.appendChild(viewClone);
+
+                // Activate the view (for CSS transitions)
+                const viewElement = appContainer.querySelector('.view');
+                if(viewElement) {
+                    setTimeout(() => viewElement.classList.add('active'), 10);
+                }
+
+                // Render specific view content
+                switch (viewId) {
+                    case 'admin-dashboard-template':
+                        renderAdminDashboard();
+                        break;
+                    case 'user-dashboard-template':
+                        renderUserDashboard();
+                        break;
+                    case 'form-view-template':
+                        renderFormView(params.serviceId);
+                        break;
+                }
+            } else if (viewId === 'login-view-template') {
+                 const loginTemplate = document.getElementById(viewId);
+                 appContainer.innerHTML = loginTemplate.innerHTML;
+            }
+        };
+
+        const logout = () => {
+            currentUser = null;
+            sessionStorage.removeItem('rmzUser');
+            mainNav.style.display = 'none';
+            showView('login-view-template');
+        };
+
+        const slugify = (text) => text.toString().toLowerCase()
+            .replace(/\s+/g, '_')           // Replace spaces with _
+            .replace(/[^\w-]+/g, '')       // Remove all non-word chars
+            .replace(/--+/g, '_')         // Replace multiple - with single _
+            .replace(/^-+/, '')             // Trim - from start of text
+            .replace(/-+$/, '');            // Trim - from end of text
+
+        // --- DYNAMIC FORM ENGINE ---
+
+        const renderFormView = async (serviceId) => {
+            showLoading(true);
+            try {
+                const serviceDoc = await db.collection('service_definitions').doc(serviceId).get();
+                if (!serviceDoc.exists) {
+                    showAlert('خطأ', 'الخدمة المطلوبة غير موجودة.', 'error');
+                    showView('user-dashboard-template');
+                    return;
+                }
+
+                const service = { id: serviceDoc.id, ...serviceDoc.data() };
+                document.getElementById('form-title').textContent = `تقديم طلب لخدمة: ${service.serviceName}`;
+                
+                const form = document.getElementById('dynamic-form');
+                form.innerHTML = ''; // Clear existing fields
+                
+                service.fields.forEach(field => {
+                    const fieldContainer = document.createElement('div');
+                    fieldContainer.className = 'col-md-6 mb-3';
+                    
+                    let fieldHtml = `<label for="${field.name}" class="form-label">${field.label}${field.required ? ' <span class="text-danger">*</span>' : ''}</label>`;
+
+                    switch (field.type) {
+                        case 'text':
+                        case 'number':
+                        case 'date':
+                            fieldHtml += `<input type="${field.type}" class="form-control" id="${field.name}" name="${field.name}" ${field.required ? 'required' : ''}>`;
+                            break;
+                        case 'select':
+                            fieldHtml += `<select class="form-select" id="${field.name}" name="${field.name}" ${field.required ? 'required' : ''}>`;
+                            fieldHtml += `<option value="">اختر...</option>`;
+                            field.options.forEach(opt => {
+                                fieldHtml += `<option value="${opt.trim()}">${opt.trim()}</option>`;
+                            });
+                            fieldHtml += `</select>`;
+                            break;
+                        case 'file':
+                             fieldHtml += `<input type="file" class="form-control" id="${field.name}" name="${field.name}" accept=".pdf,.jpg,.jpeg,.png" ${field.required ? 'required' : ''}>`;
+                            break;
+                    }
+
+                    fieldContainer.innerHTML = fieldHtml;
+                    form.appendChild(fieldContainer);
+                });
+
+                const submitButtonContainer = document.createElement('div');
+                submitButtonContainer.className = 'col-12 d-flex justify-content-end';
+                submitButtonContainer.innerHTML = `<button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane me-2"></i> إرسال الطلب</button>`;
+                form.appendChild(submitButtonContainer);
+                
+                form.dataset.serviceId = service.id;
+                form.dataset.serviceName = service.serviceName;
+
+            } catch (error) {
+                console.error("Error rendering form:", error);
+                showAlert('خطأ', 'حدث خطأ أثناء تحميل النموذج.', 'error');
+            } finally {
+                showLoading(false);
+            }
+        };
+
+        const handleFormSubmission = async (e) => {
+            e.preventDefault();
+            showLoading(true);
+            const form = e.target;
+            const formData = new FormData(form);
+            const submissionData = {};
+            const fileUploads = [];
+
+            const serviceId = form.dataset.serviceId;
+            const serviceDoc = await db.collection('service_definitions').doc(serviceId).get();
+            const serviceFields = serviceDoc.data().fields;
+
+            for (const field of serviceFields) {
+                const input = form.elements[field.name];
+                if (field.type === 'file' && input.files[0]) {
+                    const file = input.files[0];
+                    const submissionId = db.collection('submissions').doc().id;
+                    const storageRef = storage.ref(`submissions/${submissionId}/${file.name}`);
+                    fileUploads.push({
+                        fieldName: field.name,
+                        uploadTask: storageRef.put(file),
+                        storageRef: storageRef
+                    });
+                } else {
+                    submissionData[field.name] = formData.get(field.name);
+                }
+            }
+            
+            try {
+                // Wait for all file uploads to complete
+                await Promise.all(fileUploads.map(async (upload) => {
+                    await upload.uploadTask;
+                    const downloadURL = await upload.storageRef.getDownloadURL();
+                    submissionData[upload.fieldName] = {
+                        url: downloadURL,
+                        name: upload.uploadTask.snapshot.metadata.name
+                    };
+                }));
+
+                // Save submission to Firestore
+                await db.collection('submissions').add({
+                    userId: currentUser.uid,
+                    userEmail: currentUser.email,
+                    userRole: currentUser.role,
+                    serviceId: form.dataset.serviceId,
+                    serviceName: form.dataset.serviceName,
+                    data: submissionData,
+                    status: 'Pending',
+                    submittedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                showAlert('تم بنجاح', 'تم إرسال طلبك بنجاح.', 'success');
+                showView('user-dashboard-template');
+
+            } catch (error) {
+                console.error("Error submitting form: ", error);
+                showAlert('خطأ', 'حدث خطأ أثناء إرسال الطلب.', 'error');
+            } finally {
+                showLoading(false);
+            }
+        };
+
+
+        // --- ADMIN DASHBOARD ---
+
+        const renderAdminDashboard = () => {
+            listenForAllSubmissions();
+        };
+
+        const listenForAllSubmissions = () => {
+            const unsub = db.collection('submissions').orderBy('submittedAt', 'desc').onSnapshot(snapshot => {
+                const tableBody = document.getElementById('submissions-table-body');
+                if(!tableBody) return;
+                tableBody.innerHTML = '';
+                if(snapshot.empty) {
+                    tableBody.innerHTML = '<tr><td colspan="5" class="text-center">لا توجد طلبات حاليًا.</td></tr>';
+                    return;
+                }
+                snapshot.forEach(doc => {
+                    const submission = { id: doc.id, ...doc.data() };
+                    const date = submission.submittedAt ? submission.submittedAt.toDate().toLocaleDateString('ar-EG') : 'غير متوفر';
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${submission.serviceName}</td>
+                        <td>${submission.userEmail}</td>
+                        <td>${date}</td>
+                        <td><span class="badge bg-warning text-dark">${submission.status}</span></td>
+                        <td>
+                            <button class="btn btn-sm btn-info view-details-btn" data-id="${submission.id}"><i class="fas fa-eye"></i></button>
+                        </td>
+                    `;
+                    tableBody.appendChild(tr);
+                });
+            }, error => {
+                console.error("Error listening to submissions:", error);
+                showAlert('خطأ', 'فشل في تحميل الطلبات.', 'error');
+            });
+            unsubscribeListeners.push(unsub);
+        };
+        
+        const showSubmissionDetails = async (submissionId) => {
+            showLoading(true);
+            try {
+                const doc = await db.collection('submissions').doc(submissionId).get();
+                if (!doc.exists) {
+                    showAlert('خطأ', 'الطلب غير موجود.', 'error');
+                    return;
+                }
+                const submission = doc.data();
+                const modalBody = document.getElementById('submissionDetailsBody');
+                let content = `<p><strong>الخدمة:</strong> ${submission.serviceName}</p>`;
+                content += `<p><strong>المستخدم:</strong> ${submission.userEmail}</p>`;
+                
+                for (const [key, value] of Object.entries(submission.data)) {
+                    if (typeof value === 'object' && value.url) { // It's a file
+                        content += `<p><strong>${key}:</strong> <a href="${value.url}" target="_blank">عرض الملف (${value.name}) <i class="fas fa-external-link-alt"></i></a></p>`;
+                    } else {
+                        content += `<p><strong>${key}:</strong> ${value}</p>`;
+                    }
+                }
+                modalBody.innerHTML = content;
+                submissionModal.show();
+            } catch (error) {
+                console.error("Error fetching submission details:", error);
+                showAlert('خطأ', 'فشل في عرض التفاصيل.', 'error');
+            } finally {
+                showLoading(false);
+            }
+        };
+
+
+        const handleAddField = () => {
+            const fieldsContainer = document.getElementById('fields-container');
+            const fieldCount = fieldsContainer.children.length;
+            const fieldDiv = document.createElement('div');
+            fieldDiv.className = 'form-builder-field mb-2 d-flex flex-wrap align-items-center gap-2';
+            fieldDiv.innerHTML = `
+                <div class="flex-grow-1">
+                    <label class="form-label small">اسم الحقل</label>
+                    <input type="text" class="form-control form-control-sm field-label" placeholder="مثال: الاسم الكامل" required>
+                </div>
+                <div>
+                    <label class="form-label small">نوع الحقل</label>
+                    <select class="form-select form-select-sm field-type">
+                        <option value="text">نص</option>
+                        <option value="number">رقم</option>
+                        <option value="date">تاريخ</option>
+                        <option value="select">قائمة منسدلة</option>
+                        <option value="file">ملف</option>
+                    </select>
+                </div>
+                <div class="form-check form-switch pt-4">
+                    <input class="form-check-input field-required" type="checkbox" role="switch">
+                    <label class="form-check-label small">إجباري</label>
+                </div>
+                <div class="options-container w-100 mt-2" style="display: none;">
+                    <label class="form-label small">خيارات القائمة (افصل بينها بفاصلة)</label>
+                    <input type="text" class="form-control form-control-sm field-options" placeholder="خيار 1, خيار 2">
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-danger remove-field-btn align-self-end"><i class="fas fa-trash"></i></button>
+            `;
+            fieldsContainer.appendChild(fieldDiv);
+        };
+        
+        const handleSaveService = async (e) => {
+            e.preventDefault();
+            showLoading(true);
+
+            const serviceName = document.getElementById('service-name').value;
+            const accessibleTo = document.getElementById('accessible-to').value;
+            const fields = [];
+            
+            document.querySelectorAll('.form-builder-field').forEach(fieldDiv => {
+                const label = fieldDiv.querySelector('.field-label').value;
+                const type = fieldDiv.querySelector('.field-type').value;
+                const required = fieldDiv.querySelector('.field-required').checked;
+                const options = type === 'select' ? fieldDiv.querySelector('.field-options').value.split(',').map(s => s.trim()) : [];
+                
+                if (label && type) {
+                    fields.push({
+                        label: label,
+                        name: slugify(label),
+                        type: type,
+                        required: required,
+                        options: options
+                    });
+                }
+            });
+
+            if (!serviceName || fields.length === 0) {
+                showAlert('خطأ', 'يرجى إدخال اسم للخدمة وإضافة حقل واحد على الأقل.', 'error');
+                showLoading(false);
+                return;
+            }
+
+            try {
+                await db.collection('service_definitions').add({
+                    serviceName,
+                    accessibleTo,
+                    fields,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                showAlert('تم بنجاح', 'تم حفظ الخدمة الجديدة بنجاح.');
+                document.getElementById('service-definition-form').reset();
+                document.getElementById('fields-container').innerHTML = '';
+            } catch (error) {
+                console.error("Error saving service definition: ", error);
+                showAlert('خطأ', 'حدث خطأ أثناء حفظ الخدمة.', 'error');
+            } finally {
+                showLoading(false);
+            }
+        };
+
+
+        // --- USER DASHBOARD ---
+        
+        const renderUserDashboard = () => {
+            listenForAvailableServices();
+            listenForMySubmissions();
+        };
+
+        const listenForAvailableServices = () => {
+            const unsub = db.collection('service_definitions')
+                .where('accessibleTo', '==', currentUser.role)
+                .onSnapshot(snapshot => {
+                    const container = document.getElementById('available-services');
+                    if (!container) return;
+                    container.innerHTML = '';
+                    if (snapshot.empty) {
+                        container.innerHTML = '<p class="text-muted">لا توجد خدمات متاحة لك حاليًا.</p>';
+                        return;
+                    }
+                    snapshot.forEach(doc => {
+                        const service = { id: doc.id, ...doc.data() };
+                        const card = document.createElement('div');
+                        card.className = 'col-md-6';
+                        card.innerHTML = `
+                            <div class="card card-body text-center h-100 d-flex flex-column justify-content-center">
+                                <h5 class="card-title">${service.serviceName}</h5>
+                                <button class="btn btn-primary mt-auto apply-service-btn" data-service-id="${service.id}">
+                                    تقديم طلب <i class="fas fa-arrow-left"></i>
+                                </button>
+                            </div>
+                        `;
+                        container.appendChild(card);
+                    });
+                }, error => {
+                    console.error("Error fetching services:", error);
+                    showAlert('خطأ', 'فشل في تحميل الخدمات المتاحة.', 'error');
+                });
+            unsubscribeListeners.push(unsub);
+        };
+        
+        const listenForMySubmissions = () => {
+            const unsub = db.collection('submissions')
+                .where('userId', '==', currentUser.uid)
+                .orderBy('submittedAt', 'desc')
+                .onSnapshot(snapshot => {
+                    const list = document.getElementById('my-submissions');
+                    if (!list) return;
+                    list.innerHTML = '';
+                    if (snapshot.empty) {
+                        list.innerHTML = '<li class="list-group-item">لم تقم بتقديم أي طلبات بعد.</li>';
+                        return;
+                    }
+                    snapshot.forEach(doc => {
+                        const sub = doc.data();
+                        const date = sub.submittedAt ? sub.submittedAt.toDate().toLocaleDateString('ar-EG') : '';
+                        const li = document.createElement('li');
+                        li.className = 'list-group-item d-flex justify-content-between align-items-center';
+                        li.innerHTML = `
+                            <div>
+                                <h6 class="mb-0">${sub.serviceName}</h6>
+                                <small class="text-muted">${date}</small>
+                            </div>
+                            <span class="badge bg-warning text-dark">${sub.status}</span>
+                        `;
+                        list.appendChild(li);
+                    });
+                }, error => {
+                    console.error("Error fetching my submissions:", error);
+                    showAlert('خطأ', 'فشل في تحميل طلباتك السابقة.', 'error');
+                });
+            unsubscribeListeners.push(unsub);
+        };
+        
+
+        // --- EVENT LISTENERS ---
+        
+        const setupEventListeners = () => {
+            document.body.addEventListener('submit', (e) => {
+                if (e.target.id === 'admin-login-form') {
+                    e.preventDefault();
+                    const username = e.target.elements['admin-username'].value;
+                    const password = e.target.elements['admin-password'].value;
+                    if (username === 'admin' && password === 'admin123') {
+                        currentUser = { uid: 'admin', role: 'Admin', email: 'admin@rmz.org' };
+                        sessionStorage.setItem('rmzUser', JSON.stringify(currentUser));
+                        initApp();
+                    } else {
+                        showAlert('خطأ في الدخول', 'اسم المستخدم أو كلمة المرور غير صحيحة.', 'error');
+                    }
+                }
+                if (e.target.id === 'user-login-form') {
+                    e.preventDefault();
+                    // This is a simulated login/register
+                    const email = e.target.elements['user-email'].value;
+                    const role = e.target.elements['user-role'].value;
+                    currentUser = { uid: `user_${email}`, email, role }; // Simple UID generation for simulation
+                    sessionStorage.setItem('rmzUser', JSON.stringify(currentUser));
+                    initApp();
+                }
+                if (e.target.id === 'service-definition-form') {
+                    handleSaveService(e);
+                }
+                if(e.target.id === 'dynamic-form'){
+                    handleFormSubmission(e);
+                }
+            });
+
+            document.body.addEventListener('click', (e) => {
+                if(e.target.id === 'logout-btn') logout();
+                if(e.target.id === 'add-field-btn') handleAddField();
+                if(e.target.closest('.remove-field-btn')) e.target.closest('.form-builder-field').remove();
+                if(e.target.closest('.apply-service-btn')) {
+                    const serviceId = e.target.closest('.apply-service-btn').dataset.serviceId;
+                    showView('form-view-template', { serviceId });
+                }
+                if(e.target.id === 'back-to-dashboard-btn') {
+                    showView('user-dashboard-template');
+                }
+                if(e.target.closest('.view-details-btn')){
+                    const submissionId = e.target.closest('.view-details-btn').dataset.id;
+                    showSubmissionDetails(submissionId);
+                }
+            });
+            
+            document.body.addEventListener('change', (e) => {
+                if (e.target.classList.contains('field-type')) {
+                    const optionsContainer = e.target.closest('.form-builder-field').querySelector('.options-container');
+                    optionsContainer.style.display = e.target.value === 'select' ? 'block' : 'none';
+                }
+            });
+        };
+
+
+        // --- APP INITIALIZATION ---
+
+        const initApp = () => {
+            mainNav.style.display = 'flex';
+            welcomeMessage.textContent = `مرحبًا، ${currentUser.email}`;
+            
+            if (currentUser.role === 'Admin') {
+                showView('admin-dashboard-template');
+            } else {
+                showView('user-dashboard-template');
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            submissionModal = new bootstrap.Modal(document.getElementById('submissionDetailsModal'));
+            const storedUser = sessionStorage.getItem('rmzUser');
+            if (storedUser) {
+                currentUser = JSON.parse(storedUser);
+                initApp();
+            } else {
+                showView('login-view-template');
+            }
+            setupEventListeners();
+        });
+    </script>
+
+</body>
+</html>
